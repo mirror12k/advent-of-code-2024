@@ -4,6 +4,9 @@ use warnings;
 use feature qw/ say /;
 use Data::Dumper;
 
+sub readfile { local $/; my $file = IO::File->new($_[0], 'r'); <$file> }
+sub writefile { local $/; my $file = IO::File->new($_[0], 'w'); $file->print($_[1]) }
+
 sub sum { my $s = 0; foreach my $n (@_) { $s += $n } $s }
 sub product { my $p = 1; foreach my $n (@_) { $p *= $n } $p }
 sub min { (sort { $a <=> $b } @_)[0] }
@@ -12,11 +15,24 @@ sub reduce (&$@) { my ($fun, $reduced, @values) = @_; for (@values) { $reduced =
 sub freq { my %freq; $freq{$_}++ for @_; return %freq; }
 sub all (&@) { my ($fun, @args) = @_; foreach (@args) { return 0 unless $fun->() } return 1 }
 sub none (&@) { my ($fun, @args) = @_; foreach (@args) { return 0 if $fun->() } return 1 }
+sub first (&@) { my ($fun, @args) = @_; foreach (@args) { return $_ if $fun->() } return undef }
 # n-dimensional mapper function
 sub map_nd {
 	my ($fun, $arr) = @_;
 	return [ map { $fun->($_) } @$arr ] if (@$arr >= 0 and ref $arr->[0] ne 'ARRAY');
 	return [ map map_nd($fun, $_), @$arr ];
+}
+sub slice_nd {
+    my ($slices, $arr) = @_;
+    my $current_slice = $slices->[0];
+    my @next_slices = @$slices[1 .. $#$slices];
+    my $start = $current_slice->[0] // 0;
+    my $end = $current_slice->[1] // $#$arr;
+    $start += @$arr if $start < 0;
+    $end += $#$arr if $end <= 0;
+    
+    return [ map { slice_nd(\@next_slices, $_) } @$arr[$start .. $end] ] if @next_slices;
+    return [ @$arr[$start .. $end] ];
 }
 # Function to determine the dimensionality and lengths in each dimension of an n-dimensional array
 sub shape {
@@ -52,5 +68,6 @@ sub transpose_2d (@) {
     return [ map { my $i = $_; [ map $_->[$i], @$arr ] } 0 .. $#{$arr->[0]} ]
 }
 
+sub selector ($) { eval 'sub { $_ ? $_->' . join ('', map "{$_}", split /\./, $_[0]) . ' : undef }' }
 
 1;

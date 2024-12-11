@@ -10,6 +10,7 @@ our @EXPORT = qw/
 	graphql_query
 /;
 
+use Data::Dumper;
 
 
 sub parse_graphql_query {
@@ -113,8 +114,8 @@ sub execute_graphql_code {
 		if (exists $context->{$key}) {
 			my $val = $context->{$key};
 
-			if (exists $code->{$name}{_params}) {
-				$val = $val->($code->{$name}{_params});
+			if (exists $code->{$name}{_params} or 'CODE' eq ref $val) {
+				$val = $val->($context, $code->{$name}{_params});
 				# say "got modified val:", Dumper $val;
 			}
 			if (exists $code->{$name}{_nested}) {
@@ -123,12 +124,36 @@ sub execute_graphql_code {
 			}
 			$result{$name} = $val;
 		} else {
-			die "Unsupported query key: $key";
+			die "Unsupported query key: $key, context is: " . Dumper $context;
 		}
 	}
 
 	return \%result;
 }
+
+sub get_value {
+	my ($arr, $coord) = @_;
+	my $value = $arr;
+	my () = map { $value = $_ < 0 ? undef : $value->[$_] } @$coord;
+    return $value;
+}
+
+our %graphql_methods = (
+    neighbor => sub {
+        my ($self, $params) = @_;
+        my $new_coord = [ map { $params->{"abs_$pos_table[$_]"} // ($self->{coord}[$_] + ($params->{"d$pos_table[$_]"} // 0)) } 0 .. $#{$self->{coord}} ];
+        return get_context($self->{arr}, $new_coord);
+    },
+    delta => sub {
+        my ($self, $params) = @_;
+        my $new_coord = [ map { $params->{"abs_$pos_table[$_]"} // ($self->{coord}[$_] + ($params->{"d$pos_table[$_]"} // 0)) } 0 .. $#{$self->{coord}} ];
+        my $ctx = get_context($self->{arr}, $new_coord);
+        if (defined $ctx) {
+            $ctx->{value} = ($self->{value} // 0) - ($ctx->{value} // 0);
+        }
+        return $ctx;
+    },
+);
 
 sub get_context {
 	my ($arr, $coord) = @_;
@@ -139,17 +164,14 @@ sub get_context {
 		}
 	}
 
-	my $value = $arr;
-	my () = map { $value = $value->[$_] } @$coord;
+	my $value = get_value($arr, $coord);
 	my $pos = { map { $pos_table[$_] => $coord->[$_] } 0 .. $#$coord };
 	my $context = {
+        arr => $arr,
 		value => $value,
 		pos => $pos,
-		neighbor => sub {
-			my ($params) = @_;
-			my $new_coord = [ map { $coord->[$_] + ($params->{"d$pos_table[$_]"} // 0) } 0 .. $#$coord ];
-			return get_context($arr, $new_coord);
-		},
+        coord => $coord,
+        %graphql_methods,
 	};
 
 	return $context;
