@@ -62,6 +62,10 @@ sub parse_2d_string_array {
     my ($input) = @_;
     return [ map [ split ], grep $_, split /\n/, $input ];
 }
+sub parse_2d_map_array {
+    my ($input) = @_;
+    return [ map [ split '' ], grep $_, split /\n/, $input ];
+}
 
 sub transpose_2d (@) {
     my ($arr) = @_;

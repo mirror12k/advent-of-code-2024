@@ -155,6 +155,11 @@ our %graphql_methods = (
     },
 );
 
+$graphql::graphql_methods{where} = sub {
+        my ($self, $params) = @_;
+        return (defined ($self->{value}) and $self->{value} eq $params->{value}) ? $self : undef;
+    };
+
 sub get_context {
 	my ($arr, $coord) = @_;
 
