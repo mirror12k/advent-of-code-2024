@@ -3,7 +3,7 @@ package graphql;
 use strict;
 use warnings;
 
-use feature qw/ say /;
+use feature qw/ say state /;
 
 use base 'Exporter';
 our @EXPORT = qw/
@@ -28,12 +28,14 @@ sub tokenize_graphql {
 		([{}])|                   # Match braces
 		([()])|                   # Match paren
 		([a-z_][a-z0-9_]*)|       # Match field names
+		("[^"\\]*")|              # Match strings
+        ('[^'\\]*')|              # Match single-quote strings
 		([-+]?\d+)|               # Match numbers
 		([,])|                    # Match commas
 		(:)|                      # Match colons
 		(\s+)                     # Match whitespace
 	/xig) {
-		push @tokens, $1 // $2 // $3 // $4 // $5 // $6 if defined ($1 // $2 // $3 // $4 // $5 // $6);
+		push @tokens, $1 // $2 // $3 // $4 // $5 // $6 // $7 // $8 if defined ($1 // $2 // $3 // $4 // $5 // $6 // $7 // $8);
 	}
 	return @tokens;
 }
@@ -89,7 +91,8 @@ sub parse_params {
         die "expected ':' after argument key" unless shift @$tokens eq ':';
 
         my $value = shift @$tokens;
-        die "expected argument value, got: $value" unless $value =~ /^[-+]?\d+(\.\d+)?|[a-zA-Z_][a-zA-Z0-9_]*$/;
+        die "expected argument value, got: $value" unless $value =~ /^([-+]?\d+(\.\d+)?|[a-zA-Z_][a-zA-Z0-9_]*|"[^"\\]*"|'[^'\\]*')$/;
+        $value = $1 // $2 if $value =~ /^"([^"\\]*)"|'([^'\\]*)'$/;
 
         $params{$key} = $value;
 
@@ -159,6 +162,11 @@ $graphql::graphql_methods{where} = sub {
         my ($self, $params) = @_;
         return (defined ($self->{value}) and $self->{value} eq $params->{value}) ? $self : undef;
     };
+$graphql::graphql_methods{row} = sub {
+        my ($self, $params) = @_;
+        my @row = @{$self->{arr}[$self->{coord}[0]]};
+        return [ @row ];
+    };
 
 sub get_context {
 	my ($arr, $coord) = @_;
@@ -182,7 +190,19 @@ sub get_context {
 	return $context;
 }
 
-sub graphql_query {
+sub cached_single_arg {
+    my ($fun) = @_;
+    return sub {
+        my ($arg) = @_;
+        state %cached_single_arg_table;
+        unless (exists $cached_single_arg_table{$fun}{$arg}) {
+            $cached_single_arg_table{$fun}{$arg} = $fun->($arg);
+        }
+        return $cached_single_arg_table{$fun}{$arg};
+    }
+}
+
+sub _graphql_query {
 	my ($query) = @_;
 	my $code = parse_graphql_query($query);
 	# say Dumper $code;
@@ -192,5 +212,6 @@ sub graphql_query {
 		return execute_graphql_code($code, $context);
 	};
 }
+*graphql_query = cached_single_arg(sub { _graphql_query(@_) });
 
 1;

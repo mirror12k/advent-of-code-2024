@@ -1,7 +1,7 @@
 use strict;
 use warnings;
 
-use feature qw/ say /;
+use feature qw/ say state /;
 use Data::Dumper;
 
 sub readfile { local $/; my $file = IO::File->new($_[0], 'r'); <$file> }
@@ -13,6 +13,7 @@ sub min { (sort { $a <=> $b } @_)[0] }
 sub max { (sort { $a <=> $b } @_)[-1] }
 sub reduce (&$@) { my ($fun, $reduced, @values) = @_; for (@values) { $reduced = $fun->($reduced, $_) } $reduced }
 sub freq { my %freq; $freq{$_}++ for @_; return %freq; }
+sub uniq { my %h; @h{@_} = (); keys %h }
 sub all (&@) { my ($fun, @args) = @_; foreach (@args) { return 0 unless $fun->() } return 1 }
 sub none (&@) { my ($fun, @args) = @_; foreach (@args) { return 0 if $fun->() } return 1 }
 sub first (&@) { my ($fun, @args) = @_; foreach (@args) { return $_ if $fun->() } return undef }
@@ -57,6 +58,11 @@ sub map_nd_indexed {
 	return [ map $fun->($arr, [ @coords, $_ ]), 0 .. $#$iter ] if (@$iter >= 0 and ref $iter->[0] ne 'ARRAY');
 	return [ map map_nd_indexed($fun, $arr, $iter->[$_], @coords, $_), 0 .. $#$iter ];
 }
+sub map_rows {
+    my ($fun, $arr) = @_;
+	return [ map { $fun->($_) } @$arr ] if (@$arr >= 0 and ref $arr->[0][0] ne 'ARRAY');
+	return [ map map_rows($fun, $_), @$arr ];
+}
 
 sub parse_2d_string_array {
     my ($input) = @_;
@@ -66,13 +72,49 @@ sub parse_2d_map_array {
     my ($input) = @_;
     return [ map [ split '' ], grep $_, split /\n/, $input ];
 }
+sub string_2d_map_array {
+    my ($arr) = @_;
+    return join "\n", map { join '', @$_ } @$arr;
+}
 
 sub transpose_2d (@) {
     my ($arr) = @_;
     return [ map { my $i = $_; [ map $_->[$i], @$arr ] } 0 .. $#{$arr->[0]} ]
 }
 
-sub selector ($) { eval 'sub { $_ ? $_->' . join ('', map "{$_}", split /\./, $_[0]) . ' : undef }' }
-sub selector_multi ($) { eval 'sub { [' . join(',', map { '($_ ? $_->' . join ('', map "{$_}", split /\./, $_) . ' : undef)' } split /,/, ($_[0] =~ s/\s+//gr)) . '] }' }
+sub group_by {
+    my ($key, @data) = @_;
+    my %table;
+    foreach (@data) {
+        push @{$table{$_->{$key}}}, $_;
+    }
+    return %table;
+}
+
+sub group {
+    my (@data) = @_;
+    my %table;
+    foreach (@data) {
+        push @{$table{$_}}, $_;
+    }
+    return %table;
+}
+
+sub cached_single_arg {
+    my ($fun) = @_;
+    return sub {
+        my ($arg) = @_;
+        state %cached_single_arg_table;
+        unless (exists $cached_single_arg_table{$fun}{$arg}) {
+            $cached_single_arg_table{$fun}{$arg} = $fun->($arg);
+        }
+        return $cached_single_arg_table{$fun}{$arg};
+    }
+}
+
+# sub selector ($) { eval 'sub { $_ ? $_->' . join ('', map "{$_}", split /\./, $_[0]) . ' : undef }' }
+# sub selector_multi ($) { eval 'sub { [' . join(',', map { '($_ ? $_->' . join ('', map "{$_}", split /\./, $_) . ' : undef)' } split /,/, ($_[0] =~ s/\s+//gr)) . '] }' }
+*selector = cached_single_arg(sub { eval 'sub { $_ ? $_->' . join ('', map "{$_}", split /\./, $_[0]) . ' : undef }' });
+*selector_multi = cached_single_arg(sub { eval 'sub { [' . join(',', map { '($_ ? $_->' . join ('', map "{$_}", split /\./, $_) . ' : undef)' } split /,/, ($_[0] =~ s/\s+//gr)) . '] }' });
 
 1;
