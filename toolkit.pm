@@ -82,15 +82,6 @@ sub transpose_2d (@) {
     return [ map { my $i = $_; [ map $_->[$i], @$arr ] } 0 .. $#{$arr->[0]} ]
 }
 
-sub group_by {
-    my ($key, @data) = @_;
-    my %table;
-    foreach (@data) {
-        push @{$table{$_->{$key}}}, $_;
-    }
-    return %table;
-}
-
 sub group {
     my (@data) = @_;
     my %table;
@@ -98,6 +89,26 @@ sub group {
         push @{$table{$_}}, $_;
     }
     return %table;
+}
+
+sub group_by {
+    my ($fun, @args) = @_;
+    my %table;
+    if (ref $fun eq 'CODE') {
+        foreach (@args) {
+            push @{$table{$fun->($_)}}, $_;
+        }
+    } else {
+        foreach (@args) {
+            push @{$table{$_->{$_}}}, $_;
+        }
+    }
+    return %table;
+}
+sub map_groups {
+    my ($fun, %groups) = @_;
+    my %res = map $fun->($_, $groups{$_}), keys %groups;
+    return %res;
 }
 
 sub cached_single_arg {

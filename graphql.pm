@@ -167,6 +167,21 @@ $graphql::graphql_methods{row} = sub {
         my @row = @{$self->{arr}[$self->{coord}[0]]};
         return [ @row ];
     };
+$graphql::graphql_methods{group_by} = sub {
+        my ($self, $params) = @_;
+        my $key = $params->{key};
+        my $arr = $self->{arr};
+
+        state $cached //= {};
+
+        $cached->{"$arr/$key"} = {
+            group_by selector($key),
+            flatten_nd
+            map_nd_indexed graphql_query("{ value }"),
+            $self->{arr}
+        } unless exists $cached->{"$arr/$key"};
+        return $cached->{"$arr/$key"};
+    };
 
 sub get_context {
 	my ($arr, $coord) = @_;
