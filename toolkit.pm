@@ -123,6 +123,30 @@ sub cached_single_arg {
     }
 }
 
+sub timer { my $start = time; $_[0]->(); my $time = time - $start; say "[time] $time seconds"; }
+
+our $cache_miss = 0;
+our $cache_hit = 0;
+
+sub cached_args {
+    my ($fun) = @_;
+    return sub {
+        my $key = join ',', @_;
+        state %cached_single_arg_table;
+        unless (exists $cached_single_arg_table{$fun}{$key}) {
+            $cache_miss++;
+            # say "no hit: $key";
+            $cached_single_arg_table{$fun}{$key} = [ $fun->(@_) ];
+        } else {
+            $cache_hit++;
+        }
+        return @{$cached_single_arg_table{$fun}{$key}};
+    }
+}
+sub print_cache_stats {
+    say "cache hit/miss: $cache_hit/$cache_miss";
+}
+
 # sub selector ($) { eval 'sub { $_ ? $_->' . join ('', map "{$_}", split /\./, $_[0]) . ' : undef }' }
 # sub selector_multi ($) { eval 'sub { [' . join(',', map { '($_ ? $_->' . join ('', map "{$_}", split /\./, $_) . ' : undef)' } split /,/, ($_[0] =~ s/\s+//gr)) . '] }' }
 *selector = cached_single_arg(sub { eval 'sub { $_ ? $_->' . join ('', map "{$_}", split /\./, $_[0]) . ' : undef }' });
