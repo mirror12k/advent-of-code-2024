@@ -167,6 +167,18 @@ $graphql::graphql_methods{row} = sub {
         my @row = @{$self->{arr}[$self->{coord}[0]]};
         return [ @row ];
     };
+sub cached_single_arg {
+    my ($fun) = @_;
+    return sub {
+        my ($arg) = @_;
+        state %cached_single_arg_table;
+        unless (exists $cached_single_arg_table{$fun}{$arg}) {
+            $cached_single_arg_table{$fun}{$arg} = $fun->($arg);
+        }
+        return $cached_single_arg_table{$fun}{$arg};
+    }
+}
+*selector = cached_single_arg(sub { eval 'sub { $_ ? $_->' . join ('', map "{$_}", split /\./, $_[0]) . ' : undef }' });
 $graphql::graphql_methods{group_by} = sub {
         my ($self, $params) = @_;
         my $key = $params->{key};
