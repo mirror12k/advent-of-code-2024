@@ -124,6 +124,7 @@ sub cached_single_arg {
 }
 
 sub timer { my $start = time; $_[0]->(); my $time = time - $start; say "[time] $time seconds"; }
+sub confirm { my ($a, $b) = @_; die "expiremental '$a' doesn't match expected $b" unless $a eq $b; say "confirmed: $a"; return $a }
 
 our $cache_miss = 0;
 our $cache_hit = 0;
@@ -146,6 +147,8 @@ sub cached_args {
 sub print_cache_stats {
     say "cache hit/miss: $cache_hit/$cache_miss";
 }
+
+
 
 # sub selector ($) { eval 'sub { $_ ? $_->' . join ('', map "{$_}", split /\./, $_[0]) . ' : undef }' }
 # sub selector_multi ($) { eval 'sub { [' . join(',', map { '($_ ? $_->' . join ('', map "{$_}", split /\./, $_) . ' : undef)' } split /,/, ($_[0] =~ s/\s+//gr)) . '] }' }

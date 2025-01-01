@@ -179,6 +179,49 @@ sub cached_single_arg {
     }
 }
 *selector = cached_single_arg(sub { eval 'sub { $_ ? $_->' . join ('', map "{$_}", split /\./, $_[0]) . ' : undef }' });
+
+sub subp { my ($a, $b) = @_; return [ map { $a->[$_] - $b->[$_] } 0 .. $#$a ]; }
+sub addp { my ($a, $b) = @_; return [ map { $a->[$_] + $b->[$_] } 0 .. $#$a ]; }
+sub stringp { my ($p) = $_[0] // $_; return join ',', @$p }
+sub uniqp { my %h; @h{map $_->[0].','.$_->[1], @_} = (); map [ split ',' ], keys %h }
+sub in_bounds {
+    my ($p, @shape) = @_;
+    return $p->[0] >= 0 && $p->[1] >= 0 && $p->[0] < $shape[0] && $p->[1] < $shape[1];
+}
+sub adjacent_points {
+    my ($p, @shape) = @_;
+    my @adj;
+    return grep in_bounds($_, @shape), map addp($p, $_), [-1,0],[1,0],[0,-1],[0,1];
+}
+$graphql::graphql_methods{flood_group} = sub {
+        my ($self, $params) = @_;
+        my $arr = $self->{arr};
+        my @shape = shape($self->{arr});
+
+        state %flood_group_cache;
+
+        return $flood_group_cache{$arr}{stringp($self->{coord})} if exists $flood_group_cache{$arr}{stringp($self->{coord})};
+        
+        my $key = $self->{value};
+        my %group;
+        my @next_points = ($self->{coord});
+        my $rep = 0;
+        while (@next_points) {
+            die if $rep++ > 50;
+            @group{map stringp, @next_points} = ();
+            @next_points =
+                uniqp
+                grep { not exists $group{stringp $_} }
+                grep $arr->[$_->[0]][$_->[1]] eq $key,
+                map adjacent_points($_, @shape),
+                @next_points;
+        }
+        my $ret = [ map [split ','], keys %group ];
+        foreach (@$ret) {
+            $flood_group_cache{$arr}{stringp $_} = $ret;
+        }
+        return $ret;
+    };
 $graphql::graphql_methods{group_by} = sub {
         my ($self, $params) = @_;
         my $key = $params->{key};
@@ -189,7 +232,6 @@ $graphql::graphql_methods{group_by} = sub {
         $cached->{"$arr/$key"} = {
             group_by selector($key),
             flatten_nd
-            map_nd_indexed graphql_query("{ value }"),
             $self->{arr}
         } unless exists $cached->{"$arr/$key"};
         return $cached->{"$arr/$key"};
@@ -215,18 +257,6 @@ sub get_context {
 	};
 
 	return $context;
-}
-
-sub cached_single_arg {
-    my ($fun) = @_;
-    return sub {
-        my ($arg) = @_;
-        state %cached_single_arg_table;
-        unless (exists $cached_single_arg_table{$fun}{$arg}) {
-            $cached_single_arg_table{$fun}{$arg} = $fun->($arg);
-        }
-        return $cached_single_arg_table{$fun}{$arg};
-    }
 }
 
 sub _graphql_query {
