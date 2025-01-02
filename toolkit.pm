@@ -6,6 +6,7 @@ use Data::Dumper;
 
 sub readfile { local $/; my $file = IO::File->new($_[0], 'r'); <$file> }
 sub writefile { local $/; my $file = IO::File->new($_[0], 'w'); $file->print($_[1]) }
+sub appendfile { local $/; my $file = IO::File->new($_[0], 'a'); $file->print($_[1]) }
 
 sub sum { my $s = 0; foreach my $n (@_) { $s += $n } $s }
 sub product { my $p = 1; foreach my $n (@_) { $p *= $n } $p }
@@ -17,6 +18,10 @@ sub uniq { my %h; @h{@_} = (); keys %h }
 sub all (&@) { my ($fun, @args) = @_; foreach (@args) { return 0 unless $fun->() } return 1 }
 sub none (&@) { my ($fun, @args) = @_; foreach (@args) { return 0 if $fun->() } return 1 }
 sub first (&@) { my ($fun, @args) = @_; foreach (@args) { return $_ if $fun->() } return undef }
+sub shuffle { map $_->[1], sort { $a->[0] <=> $b->[0] } map [rand, $_], @_ }
+
+sub round { sprintf "%.0f", $_[0] }
+
 # n-dimensional mapper function
 sub map_nd {
 	my ($fun, $arr) = @_;
@@ -30,7 +35,7 @@ sub slice_nd {
     my $start = $current_slice->[0] // 0;
     my $end = $current_slice->[1] // $#$arr;
     $start += @$arr if $start < 0;
-    $end += $#$arr if $end <= 0;
+    $end += @$arr if $end < 0;
     
     return [ map { slice_nd(\@next_slices, $_) } @$arr[$start .. $end] ] if @next_slices;
     return [ @$arr[$start .. $end] ];
@@ -123,7 +128,7 @@ sub cached_single_arg {
     }
 }
 
-sub timer { my $start = time; $_[0]->(); my $time = time - $start; say "[time] $time seconds"; }
+sub timer { my $start = time; $_[0]->(); my $time = time - $start; say "[time] $time seconds"; $time }
 sub confirm { my ($a, $b) = @_; die "expiremental '$a' doesn't match expected $b" unless $a eq $b; say "confirmed: $a"; return $a }
 
 our $cache_miss = 0;
