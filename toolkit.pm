@@ -69,6 +69,11 @@ sub map_rows {
 	return [ map map_rows($fun, $_), @$arr ];
 }
 
+sub nd_from_shape {
+    my @shape = @_;
+    return [ map undef, 0 .. $shape[0] - 1 ] if @shape == 1;
+    return [ map nd_from_shape(@shape[1 .. $#shape]), 0 .. $shape[0] - 1 ];
+}
 sub parse_2d_string_array {
     my ($input) = @_;
     return [ map [ split ], grep $_, split /\n/, $input ];
