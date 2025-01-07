@@ -86,6 +86,10 @@ sub string_2d_map_array {
     my ($arr) = @_;
     return join "\n", map { join '', @$_ } @$arr;
 }
+sub string_2d_numbers_array {
+    my ($arr) = @_;
+    return join "\n", map { join '', map { defined ? sprintf "% 6d|", $_ : '      |' } @$_ } @$arr;
+}
 
 sub transpose_2d (@) {
     my ($arr) = @_;
