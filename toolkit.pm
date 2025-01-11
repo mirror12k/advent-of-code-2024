@@ -56,11 +56,19 @@ sub flatten_nd {
 	return @$arr if (@$arr >= 0 and ref $arr->[0] ne 'ARRAY');
 	return map flatten_nd($_), @$arr;
 }
+
+sub get_value {
+	my ($arr, $coord) = @_;
+	my $value = $arr;
+	my () = map { $value = $_ < 0 ? undef : $value->[$_] } @$coord;
+    return $value;
+}
+
 # n-dimensional mapper function with coordinates
 sub map_nd_indexed {
 	my ($fun, $arr, $iter, @coords) = @_;
 	$iter //= $arr;
-	return [ map $fun->($arr, [ @coords, $_ ]), 0 .. $#$iter ] if (@$iter >= 0 and ref $iter->[0] ne 'ARRAY');
+	return [ map $fun->($arr, [ @coords, $_ ], get_value($arr, [ @coords, $_ ])), 0 .. $#$iter ] if (@$iter >= 0 and ref $iter->[0] ne 'ARRAY');
 	return [ map map_nd_indexed($fun, $arr, $iter->[$_], @coords, $_), 0 .. $#$iter ];
 }
 sub map_rows {
