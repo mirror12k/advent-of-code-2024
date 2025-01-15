@@ -145,7 +145,9 @@ sub cached_single_arg {
     }
 }
 
-sub timer { my $start = time; $_[0]->(); my $time = time - $start; say "[time] $time seconds"; $time }
+our $timer_start_timestamp;
+sub timecheck { die "time out!" if defined $timer_start_timestamp and time - $timer_start_timestamp >= ($_[0] // 15); }
+sub timer { $timer_start_timestamp = time; $_[0]->(); my $time = time - $timer_start_timestamp; say "[time] $time seconds"; $timer_start_timestamp = undef; $time }
 sub confirm { my ($a, $b) = @_; die "expiremental '$a' doesn't match expected $b" unless $a eq $b; say "confirmed: $a"; return $a }
 
 our $cache_miss = 0;
